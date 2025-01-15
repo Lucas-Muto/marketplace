@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { EloRank } from '@prisma/client';
 
 interface PriceCalculationResult {
@@ -11,8 +11,8 @@ interface PriceCalculationResult {
 
 @Injectable()
 export class PricingService {
-  private readonly BASE_PRICE = 10; // Base price per division
-  private readonly SPECIAL_RANKS = new Set([EloRank.ETERNITY, EloRank.ONE_ABOVE_ALL]);
+  private readonly BASE_PRICE = 10;
+  private readonly SPECIAL_RANKS = new Set(['ETERNITY', 'ONE_ABOVE_ALL'] as const);
   private readonly RANK_ORDER = new Map([
     [EloRank.BRONZE_III, 1],
     [EloRank.BRONZE_II, 2],
@@ -37,22 +37,22 @@ export class PricingService {
   ]);
 
   calculatePrice(startRank: EloRank, endRank: EloRank): PriceCalculationResult {
-    if (this.RANK_ORDER.get(startRank) >= this.RANK_ORDER.get(endRank)) {
-      throw new Error('End rank must be higher than start rank');
+    const startRankValue = this.RANK_ORDER.get(startRank);
+    const endRankValue = this.RANK_ORDER.get(endRank);
+
+    if (!startRankValue || !endRankValue) {
+      throw new BadRequestException('Invalid rank provided');
     }
 
-    const rankDifference = this.RANK_ORDER.get(endRank) - this.RANK_ORDER.get(startRank);
+    if (startRankValue >= endRankValue) {
+      throw new BadRequestException('End rank must be higher than start rank');
+    }
+
+    const rankDifference = endRankValue - startRankValue;
     const basePrice = rankDifference * this.BASE_PRICE;
-
-    // Calculate multiplier based on rank tiers
     const rankMultiplier = this.calculateRankMultiplier(startRank, endRank);
-
-    // Calculate special rank fee
     const specialRankFee = this.calculateSpecialRankFee(endRank);
-
-    // Calculate estimated hours
     const estimatedHours = this.calculateEstimatedHours(rankDifference);
-
     const finalPrice = (basePrice * rankMultiplier) + specialRankFee;
 
     return {
@@ -67,21 +67,15 @@ export class PricingService {
   private calculateRankMultiplier(startRank: EloRank, endRank: EloRank): number {
     const startTier = this.getTier(startRank);
     const endTier = this.getTier(endRank);
-    const tierDifference = endTier - startTier;
-
-    // Increase multiplier for higher tiers
-    return 1 + (tierDifference * 0.5);
+    return 1 + ((endTier - startTier) * 0.5);
   }
 
   private calculateSpecialRankFee(endRank: EloRank): number {
-    if (this.SPECIAL_RANKS.has(endRank)) {
-      return endRank === EloRank.ONE_ABOVE_ALL ? 500 : 250;
-    }
-    return 0;
+    return endRank === EloRank.ETERNITY ? 250 : 
+           endRank === EloRank.ONE_ABOVE_ALL ? 500 : 0;
   }
 
   private calculateEstimatedHours(rankDifference: number): number {
-    // Base estimation: 2 hours per rank difference
     return rankDifference * 2;
   }
 

@@ -7,10 +7,15 @@ describe('PricingService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PricingService],
+      providers: [
+        {
+          provide: PricingService,
+          useClass: PricingService,
+        },
+      ],
     }).compile();
 
-    service = module.get<PricingService>();
+    service = module.get(PricingService);
   });
 
   describe('calculatePrice', () => {
