@@ -1,25 +1,29 @@
-import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
+import { UsersService } from './users.service';
 
 @Controller('users')
 @UseGuards(AuthGuard('jwt'))
 export class UsersController {
-  @Get('profile')
-  getProfile(@Req() req) {
-    return req.user;
+  constructor(private readonly usersService: UsersService) {}
+
+  @Get('boosters')
+  @Roles(UserRole.ADMIN)
+  getBoosters() {
+    return this.usersService.findByRole(UserRole.BOOSTER);
   }
 
-  @Post('booster-application')
-  @Roles(UserRole.CUSTOMER)
-  applyForBooster(@Req() req, @Body() application) {
-    // Handle booster application
+  @Patch(':id/role')
+  @Roles(UserRole.ADMIN)
+  updateUserRole(@Param('id') id: string, @Body('role') role: UserRole) {
+    return this.usersService.updateRole(id, role);
   }
 
   @Get('applications')
   @Roles(UserRole.ADMIN)
   getBoosterApplications() {
-    // Get all booster applications
+    return this.usersService.findPendingApplications();
   }
 } 

@@ -29,6 +29,7 @@ export class OrdersService {
         startingRank: dto.startingRank,
         desiredRank: dto.desiredRank,
         status: OrderStatus.WAITING,
+        price: pricing.finalPrice,
         basePrice: pricing.basePrice,
         rankMultiplier: pricing.rankMultiplier,
         specialRankFee: pricing.specialRankFee,

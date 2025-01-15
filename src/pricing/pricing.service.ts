@@ -32,8 +32,11 @@ export class PricingService {
     [EloRank.GRANDMASTER_III, 16],
     [EloRank.GRANDMASTER_II, 17],
     [EloRank.GRANDMASTER_I, 18],
-    [EloRank.ETERNITY, 19],
-    [EloRank.ONE_ABOVE_ALL, 20],
+    [EloRank.CELESTIAL_III, 19],
+    [EloRank.CELESTIAL_II, 20],
+    [EloRank.CELESTIAL_I, 21],
+    [EloRank.ETERNITY, 22],
+    [EloRank.ONE_ABOVE_ALL, 23],
   ]);
 
   calculatePrice(startRank: EloRank, endRank: EloRank): PriceCalculationResult {
