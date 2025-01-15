@@ -1,0 +1,239 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  BOOSTER
+  ADMIN
+}
+
+enum OrderStatus {
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum EloRank {
+  BRONZE_III
+  BRONZE_II
+  BRONZE_I
+  SILVER_III
+  SILVER_II
+  SILVER_I
+  GOLD_III
+  GOLD_II
+  GOLD_I
+  PLATINUM_III
+  PLATINUM_II
+  PLATINUM_I
+  DIAMOND_III
+  DIAMOND_II
+  DIAMOND_I
+  GRANDMASTER_III
+  GRANDMASTER_II
+  GRANDMASTER_I
+  ETERNITY
+  ONE_ABOVE_ALL
+}
+
+enum BoosterApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PhoneVerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+}
+
+enum PaymentProvider {
+  STRIPE
+}
+
+enum PaymentIntentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELED
+  REFUNDED
+}
+
+enum PriceType {
+  BASE
+  DIVISION_JUMP
+  SPECIAL_RANK
+}
+
+model User {
+  id                    String    @id @default(uuid())
+  email                 String    @unique
+  password              String
+  fullName              String
+  country               String
+  role                  UserRole  @default(CUSTOMER)
+  phoneNumber           String?   @unique
+  phoneVerified         Boolean   @default(false)
+  phoneVerificationCode String?
+  phoneVerifiedAt       DateTime?
+  discordId            String?   @unique
+  discordUsername      String?
+  discordAvatar        String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  isActive             Boolean   @default(true)
+  lastLoginAt          DateTime?
+  emailVerified        Boolean   @default(false)
+  twoFactorEnabled     Boolean   @default(false)
+  lastPasswordChange   DateTime?
+  preferredLanguages   String[]
+  timezone             String?
+
+  // Relations
+  ordersPlaced         Order[]           @relation("CustomerOrders")
+  ordersAssigned       Order[]           @relation("BoosterOrders")
+  reviewsGiven         Review[]
+  boosterApplication   BoosterApplication?
+  phoneVerifications   PhoneVerification[]
+
+  @@map("users")
+}
+
+model PhoneVerification {
+  id          String                  @id @default(uuid())
+  userId      String
+  phoneNumber String
+  code        String
+  status      PhoneVerificationStatus @default(PENDING)
+  attempts    Int                     @default(0)
+  expiresAt   DateTime
+  createdAt   DateTime                @default(now())
+  verifiedAt  DateTime?
+
+  // Relations
+  user        User                    @relation(fields: [userId], references: [id])
+
+  @@map("phone_verifications")
+}
+
+model BoosterApplication {
+  id                String                @id @default(uuid())
+  userId            String                @unique
+  dateOfBirth       DateTime
+  languagesSpoken   String[]
+  playingRegions    String[]
+  competitiveExp    String               @db.Text
+  supportingImages  String[]             // URLs to stored images
+  currentRank       EloRank
+  highestRank       EloRank
+  highestRankSeason String
+  canStream         Boolean
+  playedRoles       String[]
+  status            BoosterApplicationStatus @default(PENDING)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  reviewedBy        String?              // Admin ID who reviewed the application
+  reviewedAt        DateTime?
+  reviewNotes       String?              @db.Text
+
+  // Relations
+  user              User                 @relation(fields: [userId], references: [id])
+
+  @@map("booster_applications")
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  customerId    String
+  boosterId     String?
+  startingRank  EloRank
+  desiredRank   EloRank
+  status        OrderStatus @default(WAITING)
+  price         Decimal
+  basePrice     Decimal    // Base price from rank pricing
+  rankMultiplier Float      @default(1.0)  // Multiplier based on rank difference
+  specialRankFee Decimal    @default(0)    // Additional fee for special ranks (e.g., Eternity)
+  extraFees     Decimal    @default(0)    // Any additional services
+  discount      Decimal    @default(0)    // Promotional discounts
+  finalPrice    Decimal    // Total after all calculations
+  paymentStatus PaymentStatus @default(PENDING)
+  estimatedHours Int
+  specialNotes  String?   @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  payment       Payment?
+  priceCalculatedAt DateTime   // When the price was calculated
+
+  // Relations
+  customer      User        @relation("CustomerOrders", fields: [customerId], references: [id])
+  booster       User?       @relation("BoosterOrders", fields: [boosterId], references: [id])
+  review        Review?
+
+  @@map("orders")
+}
+
+model Review {
+  id          String   @id @default(uuid())
+  orderId     String   @unique
+  customerId  String
+  rating      Int      @db.SmallInt
+  comment     String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  // Relations
+  order       Order    @relation(fields: [orderId], references: [id])
+  customer    User     @relation(fields: [customerId], references: [id])
+
+  @@map("reviews")
+}
+
+model BoosterProfile {
+  id                String    @id @default(uuid())
+  userId            String    @unique
+  successRate       Float     @default(0)
+  averageCompletionTime Float @default(0)
+  totalOrdersCompleted Int    @default(0)
+  availability      Json?     // Store weekly schedule
+  earnings          Decimal   @default(0)
+  
+  user              User      @relation(fields: [userId], references: [id])
+}
+
+model Payment {
+  id              String              @id @default(uuid())
+  orderId         String              @unique
+  provider        PaymentProvider     @default(STRIPE)
+  amount          Decimal
+  currency        String              @default("usd")
+  status          PaymentIntentStatus @default(PENDING)
+  stripePaymentId String?            @unique
+  stripeClientSecret String?
+  metadata        Json?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  // Relations
+  order           Order               @relation(fields: [orderId], references: [id])
+
+  @@map("payments")
+}
