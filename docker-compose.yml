@@ -17,13 +17,13 @@ services:
       - postgres
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:latest
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=eloboost_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: eloboost_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
